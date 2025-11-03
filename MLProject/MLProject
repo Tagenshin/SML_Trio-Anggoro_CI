@@ -1,0 +1,15 @@
+name: SML_Trio-Anggoro_CI
+
+conda_env: conda.yaml
+
+entry_points:
+  main:
+    parameters:
+      penalty: {type: str, default: "l2"}
+      C: {type: float, default: 0.1}
+      solver: {type: str, default: "liblinear"}
+    command: >
+      python modelling.py
+      --penalty {penalty}
+      --C {C}
+      --solver {solver}
