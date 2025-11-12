@@ -1,110 +1,89 @@
-import argparse
 import mlflow
-import mlflow.sklearn
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score,
-    f1_score, roc_auc_score
-)
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 import numpy as np
 import warnings
 import os
 import sys
 
-warnings.filterwarnings("ignore", category=UserWarning, module="mlflow")
+if __name__ == "__main__":
+    warnings.filterwarnings("ignore")
+    np.random.seed(42)
 
-# === Fungsi utama ===
-def main(dataset_path, penalty, C, solver):
-    # Setup MLflow Tracking
-    mlflow.set_tracking_uri("http://127.0.0.1:5000/")
-    mlflow.set_experiment("SML_Trio-Anggoro_CI")
+    # Ambil file dataset dari argumen atau default ke "train.csv"
+    file_path = (
+        sys.argv[4]
+        if len(sys.argv) > 4
+        else os.path.join(os.path.dirname(os.path.abspath(__file__)), "Telco-Customer-Churn_preprocessing.csv")
+    )
+    df = pd.read_csv(file_path)
 
-    # Load dataset
-    data = pd.read_csv(dataset_path)
-    X = data.drop("Churn", axis=1)
-    y = data["Churn"]
+    # Pisahkan fitur dan target
+    X = df.drop("Churn", axis=1)
+    y = df["Churn"]
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
-    input_example = pd.DataFrame(X_train[:5], columns=X.columns)
 
-    # === Jalankan Run MLflow ===
-    active_run = mlflow.active_run()
-    if active_run is None:
-        run = mlflow.start_run()
-    else:
-        run = active_run
+    # Ambil parameter dari argumen (default jika tidak diberikan)
+    penalty = sys.argv[1] if len(sys.argv) > 1 else "l2"
+    C = float(sys.argv[2]) if len(sys.argv) > 2 else 0.1
+    solver = sys.argv[3] if len(sys.argv) > 3 else "liblinear"
 
-    mlflow.sklearn.autolog()
+    # Contoh input untuk logging
+    input_example = X_train.head(5)
 
-    # Model
-    model = LogisticRegression(penalty=penalty, C=C, solver=solver)
-    model.fit(X_train, y_train)
+    # # === MLflow Logging ===
+    # mlflow.set_tracking_uri("http://127.0.0.1:5000")
+    # mlflow.set_experiment("SML_Trio-Anggoro_CI")
 
-    # Evaluasi
-    y_pred = model.predict(X_test)
-    y_proba = model.predict_proba(X_test)[:, 1]
+    # Jalankan eksperimen di MLflow
+    with mlflow.start_run():
+        # Buat dan latih model
+        model = LogisticRegression(
+            penalty=penalty,
+            C=C,
+            solver=solver,
+            max_iter=1000
+        )
+        model.fit(X_train, y_train)
 
-    acc = accuracy_score(y_test, y_pred)
-    prec = precision_score(y_test, y_pred)
-    rec = recall_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred)
-    roc_auc = roc_auc_score(y_test, y_proba)
+        # Prediksi
+        y_pred = model.predict(X_test)
+        y_prob = model.predict_proba(X_test)[:, 1]
 
-    # Logging manual ke MLflow
-    mlflow.log_param("penalty", penalty)
-    mlflow.log_param("C", C)
-    mlflow.log_param("solver", solver)
-    mlflow.log_metric("accuracy", acc)
-    mlflow.log_metric("precision", prec)
-    mlflow.log_metric("recall", rec)
-    mlflow.log_metric("f1_score", f1)
-    mlflow.log_metric("roc_auc", roc_auc)
+        # Hitung metrik evaluasi
+        acc = accuracy_score(y_test, y_pred)
+        prec = precision_score(y_test, y_pred)
+        rec = recall_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred)
+        roc = roc_auc_score(y_test, y_prob)
 
-    # Simpan model
-    mlflow.sklearn.log_model(
-        sk_model=model,
-        artifact_path="model",
-        input_example=input_example,
-        registered_model_name="CreditScoringModel_LogReg",
-    )
+        # Cetak hasil ke terminal
+        print("\n=== Evaluation Results ===")
+        print(f"Accuracy : {acc:.4f}")
+        print(f"Precision: {prec:.4f}")
+        print(f"Recall   : {rec:.4f}")
+        print(f"F1 Score : {f1:.4f}")
+        print(f"ROC AUC  : {roc:.4f}")
 
-    print("\n Logistic Regression model trained & logged to MLflow")
-    print(f"Accuracy : {acc:.4f}")
-    print(f"Precision: {prec:.4f}")
-    print(f"Recall   : {rec:.4f}")
-    print(f"F1 Score : {f1:.4f}")
-    print(f"ROC AUC  : {roc_auc:.4f}")
+        # Log parameter dan metrik ke MLflow
+        mlflow.log_param("penalty", penalty)
+        mlflow.log_param("C", C)
+        mlflow.log_param("solver", solver)
 
-    # Tutup run jika baru dibuat manual
-    if active_run is None:
-        mlflow.end_run()
+        mlflow.log_metric("accuracy", acc)
+        mlflow.log_metric("precision", prec)
+        mlflow.log_metric("recall", rec)
+        mlflow.log_metric("f1", f1)
+        mlflow.log_metric("roc_auc", roc)
 
-
-# === Entry point ===
-if __name__ == "__main__":
-    # Jika dijalankan via MLproject
-    if len(sys.argv) > 1 and sys.argv[1].endswith(".csv"):
-        dataset = sys.argv[1]
-        penalty = sys.argv[2] if len(sys.argv) > 2 else "l2"
-        C = float(sys.argv[3]) if len(sys.argv) > 3 else 0.1
-        solver = sys.argv[4] if len(sys.argv) > 4 else "liblinear"
-    else:
-        # Jika dijalankan manual (python modelling.py --dataset ...)
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--dataset", type=str, required=True)
-        parser.add_argument("--penalty", type=str, default="l2")
-        parser.add_argument("--C", type=float, default=0.1)
-        parser.add_argument("--solver", type=str, default="liblinear")
-        args = parser.parse_args()
-
-        dataset = args.dataset
-        penalty = args.penalty
-        C = args.C
-        solver = args.solver
-
-    # Jalankan fungsi utama
-    main(dataset, penalty, C, solver)
+        # Simpan model ke MLflow
+        mlflow.sklearn.log_model(
+            sk_model=model,
+            artifact_path="model",
+            input_example=input_example
+        )
