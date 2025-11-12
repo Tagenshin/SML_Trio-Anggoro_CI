@@ -8,5 +8,9 @@ entry_points:
       dataset: {type: string, default: "Telco-Customer-Churn_preprocessing.csv"}
       penalty: {type: string, default: "l2"}
       C: {type: float, default: 0.1}
-      solver: {type: string, default: "liblinear"}
-    command: "python modelling.py {dataset} {penalty} {C} {solver}"
+      solver: {type: str, default: "liblinear"}
+    command: >
+      python modelling.py
+      --penalty {penalty}
+      --C {C}
+      --solver {solver}
