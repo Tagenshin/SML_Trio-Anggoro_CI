@@ -1,16 +1,8 @@
-name: sml-trio-anggoro-CI
-
-conda_env: conda.yaml
-
 entry_points:
   main:
     parameters:
-      dataset: {type: string, default: "Telco-Customer-Churn_preprocessing.csv"}
-      penalty: {type: string, default: "l2"}
+      penalty: {type: str, default: "l2"}
       C: {type: float, default: 0.1}
       solver: {type: str, default: "liblinear"}
-    command: >
-      python modelling.py
-      --penalty {penalty}
-      --C {C}
-      --solver {solver}
+      dataset: {type: string, default: "train_pca.csv"}
+    command: "python modelling.py {penalty} {C} {solver} {dataset}"
